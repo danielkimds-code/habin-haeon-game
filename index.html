@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no" />
+<title>국기 기억력 챌린지</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0F1B2E;
+    --navy-dim: #5A6B85;
+    --cream: #F3EAD3;
+    --cream-dim: #B9BFCB;
+    --cream-matched: #FBF4E4;
+    --gold: #C9A227;
+    --teal: #3E8E7E;
+    --stamp: #B23A2E;
+    --panel: #17253C;
+    --panel-border: #2B3B57;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    background: radial-gradient(circle at 20% 0%, #1A2C48 0%, var(--navy) 55%);
+    font-family: 'IBM Plex Sans KR', system-ui, sans-serif;
+  }
+  .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .serif { font-family: 'Playfair Display', Georgia, serif; }
+  button { font-family: inherit; cursor: pointer; }
+  input { font-family: inherit; }
+
+  @keyframes cardPop { 0% { transform: scale(0.82); opacity: 0.3; } 55% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+  .pop { animation: cardPop 0.26s ease-out; }
+  @keyframes fadeUp { from { opacity:0; transform: translateY(10px);} to { opacity:1; transform:none; } }
+  .fadeup { animation: fadeUp 0.35s ease-out; }
+
+  .btn { transition: transform 0.15s ease; }
+  .btn:active { transform: scale(0.97); }
+
+  .card { width: 100%; height: 100%; aspect-ratio: 1 / 1; }
+  .face { position: relative; width: 100%; height: 100%; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+  .overlay-backdrop {
+    position: fixed; inset: 0; background: rgba(15,27,46,0.72);
+    display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50;
+  }
+  .overlay-card {
+    background: var(--cream); border-radius: 16px; padding: 22px; width: 100%; max-width: 380px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+  .ghost-btn {
+    flex: 1; background: transparent; border: 1.5px solid rgba(15,27,46,0.2); color: var(--navy);
+    border-radius: 9px; padding: 9px 8px; font-size: 12px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+  }
+  .primary-btn {
+    flex: 1.3; background: var(--navy); border: none; color: var(--cream);
+    border-radius: 9px; padding: 9px 8px; font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+  }
+  #app { min-height: 100vh; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* ---------------------------------------------------------------
+   데이터
+---------------------------------------------------------------- */
+const STAGES = [
+  { id: 1, label: "STAGE 01", pairs: 8, cols: 4 },
+  { id: 2, label: "STAGE 02", pairs: 10, cols: 5 },
+  { id: 3, label: "STAGE 03", pairs: 12, cols: 6 },
+  { id: 4, label: "STAGE 04", pairs: 14, cols: 7 },
+  { id: 5, label: "STAGE 05", pairs: 16, cols: 8 },
+];
+
+const COUNTRIES = [
+  { code: "KR", name: "대한민국" }, { code: "US", name: "미국" },
+  { code: "JP", name: "일본" }, { code: "CN", name: "중국" },
+  { code: "FR", name: "프랑스" }, { code: "DE", name: "독일" },
+  { code: "GB", name: "영국" }, { code: "IT", name: "이탈리아" },
+  { code: "ES", name: "스페인" }, { code: "BR", name: "브라질" },
+  { code: "CA", name: "캐나다" }, { code: "AU", name: "호주" },
+  { code: "RU", name: "러시아" }, { code: "IN", name: "인도" },
+  { code: "MX", name: "멕시코" }, { code: "AR", name: "아르헨티나" },
+  { code: "EG", name: "이집트" }, { code: "ZA", name: "남아공" },
+  { code: "NG", name: "나이지리아" }, { code: "KE", name: "케냐" },
+  { code: "SE", name: "스웨덴" }, { code: "NO", name: "노르웨이" },
+  { code: "FI", name: "핀란드" }, { code: "DK", name: "덴마크" },
+  { code: "NL", name: "네덜란드" }, { code: "BE", name: "벨기에" },
+  { code: "CH", name: "스위스" }, { code: "AT", name: "오스트리아" },
+  { code: "PT", name: "포르투갈" }, { code: "GR", name: "그리스" },
+  { code: "TR", name: "터키" }, { code: "PL", name: "폴란드" },
+  { code: "VN", name: "베트남" }, { code: "TH", name: "태국" },
+  { code: "ID", name: "인도네시아" }, { code: "PH", name: "필리핀" },
+  { code: "MY", name: "말레이시아" }, { code: "SG", name: "싱가포르" },
+  { code: "NZ", name: "뉴질랜드" }, { code: "SA", name: "사우디아라비아" },
+];
+
+const STORAGE_PREFIX = "flag-memory-records-stage-";
+
+const flagEmoji = (code) =>
+  code.toUpperCase().replace(/./g, (ch) => String.fromCodePoint(127397 + ch.charCodeAt(0)));
+
+const shuffle = (arr) => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+const formatTime = (ms) => {
+  const min = Math.floor(ms / 60000);
+  const sec = Math.floor((ms % 60000) / 1000);
+  const tenth = Math.floor((ms % 1000) / 100);
+  return `${String(min).padStart(2, "0")}:${String(sec).padStart(2, "0")}.${tenth}`;
+};
+
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+/* ---------------------------------------------------------------
+   상태
+---------------------------------------------------------------- */
+let state = {
+  screen: "menu",       // menu | playing | complete
+  stageIdx: 0,
+  cards: [],
+  flipped: [],
+  matchedCount: 0,
+  moves: 0,
+  lock: false,
+  elapsed: 0,
+  running: false,
+  records: {},           // stageId -> [{name,timeMs,date}]
+  recordsModalStage: null,
+  savedThisRun: false,
+  nameInput: "",
+};
+let timerHandle = null;
+
+function loadAllRecords() {
+  const out = {};
+  STAGES.forEach((s) => {
+    try {
+      const raw = localStorage.getItem(STORAGE_PREFIX + s.id);
+      out[s.id] = raw ? JSON.parse(raw) : [];
+    } catch {
+      out[s.id] = [];
+    }
+  });
+  state.records = out;
+}
+
+function saveRecordsFor(stageId, list) {
+  try {
+    localStorage.setItem(STORAGE_PREFIX + stageId, JSON.stringify(list));
+  } catch (e) {
+    console.error("기록 저장 실패", e);
+  }
+  state.records[stageId] = list;
+}
+
+/* ---------------------------------------------------------------
+   게임 로직
+---------------------------------------------------------------- */
+function buildStage(idx) {
+  const s = STAGES[idx];
+  const picked = shuffle(COUNTRIES).slice(0, s.pairs);
+  const doubled = shuffle(
+    picked.flatMap((c) => [
+      { ...c, pairKey: c.code, uid: c.code + "-a", rot: Math.random() * 8 - 4 },
+      { ...c, pairKey: c.code, uid: c.code + "-b", rot: Math.random() * 8 - 4 },
+    ])
+  );
+  state.cards = doubled.map((c) => ({ ...c, isFlipped: false, isMatched: false }));
+  state.flipped = [];
+  state.matchedCount = 0;
+  state.moves = 0;
+  state.lock = false;
+  state.elapsed = 0;
+  state.savedThisRun = false;
+  state.nameInput = "";
+}
+
+function startStage(idx) {
+  state.stageIdx = idx;
+  buildStage(idx);
+  state.screen = "playing";
+  state.running = true;
+  startTimer();
+  render();
+}
+
+function startTimer() {
+  stopTimer();
+  timerHandle = setInterval(() => {
+    state.elapsed += 100;
+    updateTimerDisplay();
+  }, 100);
+}
+function stopTimer() {
+  if (timerHandle) clearInterval(timerHandle);
+  timerHandle = null;
+}
+function updateTimerDisplay() {
+  const el = document.getElementById("timer-display");
+  if (el) el.textContent = formatTime(state.elapsed);
+}
+
+function handleCardClick(i) {
+  const c = state.cards[i];
+  if (state.lock || c.isFlipped || c.isMatched || state.flipped.length >= 2) return;
+  c.isFlipped = true;
+  state.flipped.push(i);
+  renderCard(i);
+
+  if (state.flipped.length === 2) {
+    state.lock = true;
+    state.moves += 1;
+    const [a, b] = state.flipped;
+    const stage = STAGES[state.stageIdx];
+    if (state.cards[a].pairKey === state.cards[b].pairKey) {
+      setTimeout(() => {
+        state.cards[a].isMatched = true;
+        state.cards[b].isMatched = true;
+        renderCard(a);
+        renderCard(b);
+        state.flipped = [];
+        state.lock = false;
+        state.matchedCount += 1;
+        updateHud();
+        if (state.matchedCount === stage.pairs) {
+          state.running = false;
+          stopTimer();
+          state.screen = "complete";
+          render();
+        }
+      }, 450);
+    } else {
+      setTimeout(() => {
+        state.cards[a].isFlipped = false;
+        state.cards[b].isFlipped = false;
+        renderCard(a);
+        renderCard(b);
+        state.flipped = [];
+        state.lock = false;
+      }, 850);
+    }
+  }
+}
+
+function updateHud() {
+  const stage = STAGES[state.stageIdx];
+  const el = document.getElementById("hud-matched");
+  if (el) el.textContent = `${state.matchedCount}/${stage.pairs}쌍`;
+  const mv = document.getElementById("hud-moves");
+  if (mv) mv.textContent = state.moves;
+}
+
+function currentQualifies() {
+  const stage = STAGES[state.stageIdx];
+  const list = state.records[stage.id] || [];
+  return list.length < 5 || state.elapsed < Math.max(...list.map((r) => r.timeMs), 0);
+}
+
+function saveRecord() {
+  const stage = STAGES[state.stageIdx];
+  const name = state.nameInput.trim();
+  if (!name) return;
+  const list = [...(state.records[stage.id] || []), { name, timeMs: state.elapsed, date: new Date().toISOString().slice(0, 10) }]
+    .sort((a, b) => a.timeMs - b.timeMs)
+    .slice(0, 5);
+  saveRecordsFor(stage.id, list);
+  state.savedThisRun = true;
+  render();
+}
+
+/* ---------------------------------------------------------------
+   렌더링
+---------------------------------------------------------------- */
+function render() {
+  const app = document.getElementById("app");
+  if (state.screen === "menu") app.innerHTML = renderMenu();
+  else if (state.screen === "playing") app.innerHTML = renderPlay();
+  else if (state.screen === "complete") app.innerHTML = renderComplete();
+
+  if (state.recordsModalStage) {
+    app.insertAdjacentHTML("beforeend", renderRecordsModal(state.recordsModalStage));
+  }
+}
+
+function renderMenu() {
+  const rows = STAGES.map((s) => {
+    const best = (state.records[s.id] || [])[0];
+    const bestText = best ? `최고 기록 ${formatTime(best.timeMs)} · ${esc(best.name)}` : "기록 없음";
+    return `
+      <div style="background:var(--panel);border:1px solid var(--panel-border);border-radius:14px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div>
+          <div class="mono" style="color:var(--gold);font-size:11px;letter-spacing:0.15em;">${s.label}</div>
+          <div style="color:var(--cream);font-size:15px;font-weight:500;margin-top:2px;">국기 ${s.pairs * 2}장 · ${s.pairs}쌍</div>
+          <button onclick="openRecordsModal(${s.id})" class="btn" style="margin-top:6px;background:none;border:none;padding:0;color:var(--teal);font-size:12px;display:flex;align-items:center;gap:4px;">
+            🏆 ${bestText}
+          </button>
+        </div>
+        <button onclick="startStage(${s.id - 1})" class="btn" style="background:var(--gold);color:var(--navy);border:none;border-radius:999px;padding:9px 16px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:4px;flex-shrink:0;">
+          시작 ›
+        </button>
+      </div>`;
+  }).join("");
+
+  return `
+    <div style="max-width:480px;margin:0 auto;padding:32px 20px 48px;" class="fadeup">
+      <div style="text-align:center;margin-bottom:28px;">
+        <div style="display:inline-flex;align-items:center;gap:8px;color:var(--gold);margin-bottom:6px;">
+          🌐 <span class="mono" style="font-size:12px;letter-spacing:0.2em;">WORLD PASSPORT</span>
+        </div>
+        <h1 class="serif" style="color:var(--cream);font-size:30px;margin:0;font-weight:900;">국기 기억력 챌린지</h1>
+        <p style="color:var(--cream-dim);font-size:13px;margin-top:8px;">짝을 맞출 때마다 여권에 도장을 찍어보세요.<br/>단계가 오를수록 국기 수가 늘어납니다.</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">${rows}</div>
+    </div>`;
+}
+
+function cardHTML(c, i, stage) {
+  const revealed = c.isFlipped || c.isMatched;
+  const showName = stage.cols <= 6;
+  if (revealed) {
+    const fontSize = stage.cols > 6 ? 20 : stage.cols > 4 ? 26 : 32;
+    return `
+      <div class="card" id="card-${i}">
+        <div class="face pop" onclick="handleCardClick(${i})" style="
+          background:${c.isMatched ? "var(--cream-matched)" : "#fff"};
+          border:${c.isMatched ? "2.5px solid var(--stamp)" : "2px solid var(--gold)"};
+          box-shadow:${c.isMatched ? "0 0 0 2px rgba(178,58,46,0.2) inset" : "0 2px 8px rgba(0,0,0,0.25)"};
+          transform:${c.isMatched ? `rotate(${c.rot}deg)` : "none"};
+          cursor:default;">
+          <span style="font-size:${fontSize}px;line-height:1;">${flagEmoji(c.code)}</span>
+          ${showName ? `<span style="font-size:9px;color:var(--navy);margin-top:3px;text-align:center;padding:0 2px;font-weight:${c.isMatched ? 700 : 400};">${esc(c.name)}</span>` : ""}
+          ${c.isMatched ? `<span class="mono" style="position:absolute;font-size:8px;color:var(--stamp);font-weight:700;margin-top:${stage.cols > 6 ? 30 : 46}px;letter-spacing:0.1em;">✓ MATCH</span>` : ""}
+        </div>
+      </div>`;
+  }
+  return `
+    <div class="card" id="card-${i}">
+      <div class="face" onclick="handleCardClick(${i})" style="background:var(--cream);border:1.5px dashed rgba(15,27,46,0.35);cursor:pointer;">
+        <span style="font-size:${stage.cols > 6 ? 14 : 20}px;opacity:0.35;">✦</span>
+      </div>
+    </div>`;
+}
+
+function renderCard(i) {
+  const el = document.getElementById("card-" + i);
+  if (!el) return;
+  const stage = STAGES[state.stageIdx];
+  el.outerHTML = cardHTML(state.cards[i], i, stage);
+}
+
+function renderPlay() {
+  const stage = STAGES[state.stageIdx];
+  const cardsHTML = state.cards.map((c, i) => cardHTML(c, i, stage)).join("");
+  return `
+    <div style="max-width:640px;margin:0 auto;padding:16px 12px 32px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <button onclick="exitToMenu()" class="btn" style="background:none;border:none;color:var(--cream-dim);display:flex;align-items:center;gap:4px;">
+          🏠 <span style="font-size:12px;">메뉴</span>
+        </button>
+        <div class="mono" style="color:var(--gold);font-size:12px;letter-spacing:0.15em;">${stage.label}</div>
+        <div id="hud-matched" style="color:var(--cream-dim);font-size:12px;">${state.matchedCount}/${stage.pairs}쌍</div>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:14px;">
+        <div style="flex:1;background:var(--panel);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
+          ⏱ <span id="timer-display" class="mono" style="color:var(--cream);font-size:16px;">${formatTime(state.elapsed)}</span>
+        </div>
+        <div style="background:var(--panel);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
+          <span style="color:var(--cream-dim);font-size:12px;">이동</span>
+          <span id="hud-moves" class="mono" style="color:var(--cream);font-size:16px;">${state.moves}</span>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(${stage.cols},1fr);gap:${stage.cols > 6 ? 5 : 8}px;">
+        ${cardsHTML}
+      </div>
+    </div>`;
+}
+
+function renderComplete() {
+  const stage = STAGES[state.stageIdx];
+  const qualifies = currentQualifies();
+  const list = state.records[stage.id] || [];
+
+  let recordSection = "";
+  if (qualifies && !state.savedThisRun) {
+    recordSection = `
+      <div style="margin-top:18px;">
+        <div style="font-size:13px;color:var(--stamp);font-weight:700;text-align:center;margin-bottom:8px;">🎉 여권 기록부에 등재될 기록입니다!</div>
+        <div style="display:flex;gap:8px;">
+          <input id="name-input" oninput="state.nameInput=this.value; document.getElementById('save-btn').disabled=!this.value.trim();" placeholder="이름을 입력하세요" maxlength="12"
+            style="flex:1;border:1.5px solid rgba(15,27,46,0.2);border-radius:8px;padding:9px 10px;font-size:14px;color:var(--navy);background:#fff;" />
+          <button id="save-btn" onclick="saveRecord()" disabled class="btn" style="background:var(--stamp);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-weight:700;font-size:13px;opacity:0.5;">저장</button>
+        </div>
+      </div>`;
+  } else if (state.savedThisRun) {
+    recordSection = `
+      <div style="margin-top:16px;">
+        <div style="font-size:12px;color:var(--navy-dim);margin-bottom:6px;font-weight:700;">여권 기록부 — ${stage.label}</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          ${list.map((r, i) => `
+            <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--navy);background:${i === 0 ? "rgba(201,162,39,0.13)" : "transparent"};border-radius:6px;padding:3px 6px;">
+              <span>${i + 1}. ${esc(r.name)}</span><span class="mono">${formatTime(r.timeMs)}</span>
+            </div>`).join("")}
+        </div>
+      </div>`;
+  }
+
+  const nextBtn = state.stageIdx < STAGES.length - 1
+    ? `<button onclick="startStage(${state.stageIdx + 1})" class="btn primary-btn">다음 단계 ›</button>`
+    : "";
+
+  return `
+    <div class="overlay-backdrop">
+      <div class="overlay-card fadeup">
+        <div style="text-align:center;">
+          🎖
+          <div class="mono" style="font-size:11px;color:var(--teal);letter-spacing:0.15em;">${stage.label} CLEAR</div>
+          <h2 class="serif" style="color:var(--navy);font-size:24px;margin:6px 0 2px;font-weight:900;">스테이지 클리어!</h2>
+          <div class="mono" style="font-size:30px;color:var(--navy);margin:10px 0 2px;">${formatTime(state.elapsed)}</div>
+          <div style="font-size:12px;color:var(--navy-dim);">이동 ${state.moves}회</div>
+        </div>
+        ${recordSection}
+        <div style="display:flex;gap:8px;margin-top:20px;">
+          <button onclick="exitToMenu()" class="btn ghost-btn">🏠 처음</button>
+          <button onclick="retryStage()" class="btn ghost-btn">↺ 재도전</button>
+          ${nextBtn}
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderRecordsModal(stageId) {
+  const stage = STAGES.find((s) => s.id === stageId);
+  const list = state.records[stageId] || [];
+  const body = list.length === 0
+    ? `<p style="color:var(--navy-dim);font-size:13px;">아직 기록이 없습니다. 첫 도장을 찍어보세요!</p>`
+    : `<div style="display:flex;flex-direction:column;gap:4px;">
+        ${list.map((r, i) => `
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--navy);background:${i === 0 ? "rgba(201,162,39,0.13)" : "rgba(0,0,0,0.04)"};border-radius:6px;padding:6px 8px;">
+            <span>${i + 1}. ${esc(r.name)}</span><span class="mono">${formatTime(r.timeMs)}</span>
+          </div>`).join("")}
+      </div>`;
+  return `
+    <div class="overlay-backdrop" onclick="closeRecordsModal(event)">
+      <div class="overlay-card fadeup" onclick="event.stopPropagation()">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div>
+            <div class="mono" style="font-size:11px;color:var(--teal);letter-spacing:0.15em;">${stage.label}</div>
+            <h3 class="serif" style="margin:2px 0 0;color:var(--navy);font-size:19px;font-weight:900;">여권 기록부</h3>
+          </div>
+          <button onclick="closeRecordsModal(event)" class="btn" style="background:none;border:none;color:var(--navy-dim);font-size:18px;">✕</button>
+        </div>
+        ${body}
+      </div>
+    </div>`;
+}
+
+/* ---------------------------------------------------------------
+   이벤트 핸들러
+---------------------------------------------------------------- */
+function exitToMenu() {
+  state.running = false;
+  stopTimer();
+  state.screen = "menu";
+  render();
+}
+function retryStage() {
+  buildStage(state.stageIdx);
+  state.screen = "playing";
+  state.running = true;
+  startTimer();
+  render();
+}
+function openRecordsModal(stageId) {
+  state.recordsModalStage = stageId;
+  render();
+}
+function closeRecordsModal(e) {
+  if (e) e.stopPropagation();
+  state.recordsModalStage = null;
+  render();
+}
+
+/* ---------------------------------------------------------------
+   초기화
+---------------------------------------------------------------- */
+loadAllRecords();
+render();
+</script>
+</body>
+</html>
+
+
